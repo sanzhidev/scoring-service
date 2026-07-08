@@ -1,56 +1,58 @@
 # Scoring Service (demo)
 
-A small Spring Boot REST service that scores a credit application using a
-**rule-based** scoring model and returns a score, a decision, the model
-version, and the list of factors that drove the decision.
+Небольшой REST-сервис на Spring Boot, который оценивает кредитную заявку
+с помощью **rule-based** модели скоринга и возвращает score, решение,
+версию модели и список факторов, повлиявших на решение.
 
-> **This is a demo/educational project.** It does not use real banking or
-> credit data, does not connect to any real systems, and its model is a
-> hand-written heuristic, not a trained or validated statistical/ML model.
-> It must **not** be used to make real credit decisions. See
-> [Limitations](#limitations) below.
+> **Это демонстрационный/учебный проект.** Он не использует реальные
+> банковские или кредитные данные, не подключается ни к каким реальным
+> системам, а его модель — это написанная вручную эвристика, а не
+> обученная или валидированная статистическая/ML-модель. Его **нельзя**
+> использовать для принятия реальных кредитных решений. См. раздел
+> [Ограничения](#ограничения) ниже.
 
-## Contents
+## Содержание
 
-- [Running the service](#running-the-service)
+- [Запуск сервиса](#запуск-сервиса)
 - [API](#api)
-- [Input features](#input-features)
-- [Scoring rules (model `rule-based-v1`)](#scoring-rules-model-rule-based-v1)
-- [Sample requests](#sample-requests)
-- [Architecture](#architecture)
-- [Testing](#testing)
-- [Limitations](#limitations)
-- [Migration path to ML / ONNX / an external model service](#migration-path-to-ml--onnx--an-external-model-service)
+- [Входные признаки](#входные-признаки)
+- [Правила скоринга (модель `rule-based-v1`)](#правила-скоринга-модель-rule-based-v1)
+- [Примеры запросов](#примеры-запросов)
+- [Архитектура](#архитектура)
+- [Тестирование](#тестирование)
+- [Ограничения](#ограничения)
+- [Путь миграции на ML / ONNX / внешний model service](#путь-миграции-на-ml--onnx--внешний-model-service)
 
-## Running the service
+## Запуск сервиса
 
-Prerequisites: JDK 17+ and Maven (or use the wrapper if you add one).
+Предварительные требования: JDK 17+ и Maven (либо используйте wrapper,
+если добавите его).
 
 ```bash
 mvn spring-boot:run
 ```
 
-The service starts on `http://localhost:8080`.
+Сервис запускается на `http://localhost:8080`.
 
-> **JDK note:** the test suite uses Mockito's inline mock maker, which
-> depends on ByteBuddy for bytecode instrumentation. As of this writing
-> ByteBuddy does not yet support very new JDKs (e.g. JDK 26). If `mvn test`
-> fails with a ByteBuddy/`IllegalArgumentException: Java NN ... is not
-> supported` error, point `JAVA_HOME` at a JDK 17-21 before running Maven,
-> e.g.:
+> **Замечание про JDK:** тестовый набор использует inline mock maker
+> Mockito, который для инструментирования байткода зависит от ByteBuddy.
+> На момент написания ByteBuddy ещё не поддерживает самые новые версии
+> JDK (например, JDK 26). Если `mvn test` падает с ошибкой вида
+> ByteBuddy/`IllegalArgumentException: Java NN ... is not supported`,
+> укажите в `JAVA_HOME` путь к JDK 17-21 перед запуском Maven, например:
 > ```bash
 > export JAVA_HOME=$(/usr/libexec/java_home -v 21)
 > mvn test
 > ```
 
-Build a runnable jar:
+Сборка исполняемого jar:
 
 ```bash
 mvn clean package
 java -jar target/scoring-service-0.1.0.jar
 ```
 
-### Example request
+### Пример запроса
 
 ```bash
 curl -s -X POST http://localhost:8080/api/v1/scoring \
@@ -62,19 +64,19 @@ curl -s -X POST http://localhost:8080/api/v1/scoring \
 
 ### `POST /api/v1/scoring`
 
-**Request body**
+**Тело запроса**
 
-| Field                | Type    | Format constraints              |
-|----------------------|---------|----------------------------------|
-| `requestId`          | string  | not blank                        |
-| `clientAge`          | integer | 18-100                           |
-| `monthlyIncome`      | decimal | > 0                               |
-| `requestedAmount`    | decimal | > 0                               |
-| `employmentMonths`   | integer | >= 0                              |
-| `hasOverduePayments` | boolean | required                          |
-| `activeLoansCount`   | integer | 0-50                              |
+| Поле                  | Тип     | Ограничения формата              |
+|------------------------|---------|-----------------------------------|
+| `requestId`            | string  | не пустая строка                  |
+| `clientAge`             | integer | 18-100                            |
+| `monthlyIncome`         | decimal | > 0                                |
+| `requestedAmount`       | decimal | > 0                                |
+| `employmentMonths`      | integer | >= 0                               |
+| `hasOverduePayments`    | boolean | обязательное поле                  |
+| `activeLoansCount`      | integer | 0-50                               |
 
-**Response body (200 OK)**
+**Тело ответа (200 OK)**
 
 ```json
 {
@@ -92,15 +94,16 @@ curl -s -X POST http://localhost:8080/api/v1/scoring \
 }
 ```
 
-`decision` is one of `APPROVED`, `MANUAL_REVIEW`, `REJECTED`.
+`decision` принимает одно из значений: `APPROVED`, `MANUAL_REVIEW`,
+`REJECTED`.
 
-**Validation error responses (400 Bad Request)**
+**Ответы с ошибками валидации (400 Bad Request)**
 
-Both format errors (bad types/ranges on the request DTO, checked with Bean
-Validation) and business-logic errors (implausible combinations of
-otherwise well-formed fields, checked by `FeatureBusinessValidator`) return
-the same shape, so the two failure classes are always distinguishable by
-the `error` field:
+Как ошибки формата (некорректные типы/диапазоны в request DTO,
+проверяемые Bean Validation), так и ошибки бизнес-логики
+(неправдоподобные комбинации формально корректных полей, проверяемые
+`FeatureBusinessValidator`) возвращаются в одинаковой структуре, поэтому
+эти два класса ошибок всегда можно различить по полю `error`:
 
 ```json
 {
@@ -126,70 +129,72 @@ the `error` field:
 }
 ```
 
-## Input features
+## Входные признаки
 
-| Feature              | Meaning                                                          |
-|-----------------------|-------------------------------------------------------------------|
-| `requestId`          | Caller-supplied identifier, echoed back in the response           |
-| `clientAge`          | Applicant's age in years                                          |
-| `monthlyIncome`      | Applicant's declared monthly income                               |
-| `requestedAmount`    | Amount of credit requested                                        |
-| `employmentMonths`   | Months in current employment                                      |
-| `hasOverduePayments` | Whether the applicant currently has overdue payments on record    |
-| `activeLoansCount`   | Number of active loans the applicant currently holds              |
+| Признак                | Значение                                                          |
+|--------------------------|----------------------------------------------------------------------|
+| `requestId`              | Идентификатор, переданный вызывающей стороной, возвращается в ответе |
+| `clientAge`               | Возраст заявителя в годах                                            |
+| `monthlyIncome`            | Заявленный ежемесячный доход заявителя                               |
+| `requestedAmount`          | Запрашиваемая сумма кредита                                           |
+| `employmentMonths`         | Стаж работы на текущем месте в месяцах                                |
+| `hasOverduePayments`       | Есть ли у заявителя текущие просроченные платежи                      |
+| `activeLoansCount`         | Количество действующих кредитов у заявителя                           |
 
-## Scoring rules (model `rule-based-v1`)
+## Правила скоринга (модель `rule-based-v1`)
 
-The model starts from a base score of **50** and adds/subtracts fixed
-points per rule, then clamps the result to **[0, 100]**:
+Модель стартует с базового значения score, равного **50**, прибавляет или
+вычитает фиксированные баллы по каждому правилу, а затем ограничивает
+результат диапазоном **[0, 100]**:
 
-| Rule                          | Condition                                    | Impact |
-|--------------------------------|-----------------------------------------------|--------|
-| Age                            | outside 21-65                                 | -10    |
-|                                 | 21-24 or 56-65                                | 0      |
-|                                 | 25-55                                         | +10    |
-| Requested amount / income      | ratio <= 3                                    | +20    |
-|                                 | ratio <= 6                                    | +5     |
-|                                 | ratio <= 10                                   | -10    |
-|                                 | ratio > 10                                    | -30    |
-| Employment duration            | < 6 months                                    | -15    |
-|                                 | 6-24 months                                   | 0      |
-|                                 | > 24 months                                   | +15    |
-| Overdue payments               | none                                          | +5     |
-|                                 | present                                       | -35    |
-| Active loans                   | 0                                             | +10    |
-|                                 | 1-2                                           | 0      |
-|                                 | 3-4                                           | -15    |
-|                                 | 5+                                            | -30    |
+| Правило                        | Условие                                       | Влияние |
+|----------------------------------|--------------------------------------------------|---------|
+| Возраст                          | вне диапазона 21-65                               | -10     |
+|                                   | 21-24 или 56-65                                    | 0       |
+|                                   | 25-55                                              | +10     |
+| Запрашиваемая сумма / доход      | ratio <= 3                                         | +20     |
+|                                   | ratio <= 6                                         | +5      |
+|                                   | ratio <= 10                                        | -10     |
+|                                   | ratio > 10                                         | -30     |
+| Стаж работы                      | < 6 месяцев                                        | -15     |
+|                                   | 6-24 месяцев                                       | 0       |
+|                                   | > 24 месяцев                                       | +15     |
+| Просроченные платежи             | отсутствуют                                        | +5      |
+|                                   | есть                                               | -35     |
+| Активные кредиты                 | 0                                                  | +10     |
+|                                   | 1-2                                                | 0       |
+|                                   | 3-4                                                | -15     |
+|                                   | 5+                                                 | -30     |
 
-**Decision thresholds** (on the final, clamped score):
+**Пороги принятия решения** (по итоговому, ограниченному значению score):
 
 - `score >= 70` -> `APPROVED`
 - `40 <= score < 70` -> `MANUAL_REVIEW`
 - `score < 40` -> `REJECTED`
 
-The `factors` array in the response lists every rule that fired, with its
-code, a human-readable description, and its signed point contribution -
-this is what the score is built from, in full.
+Массив `factors` в ответе перечисляет каждое сработавшее правило вместе с
+его кодом, человекочитаемым описанием и знаковым вкладом в баллах — это
+полное объяснение того, из чего сложился итоговый score.
 
-**Model version:** `rule-based-v1`, returned in every response as
-`modelVersion` (also exposed as `RuleBasedScoringModelV1.VERSION` in code)
-so that decisions remain traceable to the exact model logic that produced
-them.
+**Версия модели:** `rule-based-v1`, возвращается в каждом ответе в поле
+`modelVersion` (в коде также доступна как `RuleBasedScoringModelV1.VERSION`),
+чтобы каждое решение оставалось прослеживаемым до конкретной логики
+модели, которая его сформировала.
 
-## Sample requests
+## Примеры запросов
 
-The [`samples/`](samples) directory has ready-to-use request bodies:
+В каталоге [`samples/`](samples) лежат готовые к использованию тела
+запросов:
 
-| File                                                          | Expected result                          |
-|-----------------------------------------------------------------|--------------------------------------------|
-| [`approved-request.json`](samples/approved-request.json)                     | `score: 100`, `APPROVED`                  |
-| [`manual-review-request.json`](samples/manual-review-request.json)           | `score: 40`, `MANUAL_REVIEW`               |
-| [`rejected-request.json`](samples/rejected-request.json)                     | `score: 0`, `REJECTED`                     |
-| [`invalid-format-request.json`](samples/invalid-format-request.json)         | `400`, format validation errors            |
-| [`invalid-business-rules-request.json`](samples/invalid-business-rules-request.json) | `400`, business validation errors  |
+| Файл                                                                                  | Ожидаемый результат                       |
+|------------------------------------------------------------------------------------------|-----------------------------------------------|
+| [`approved-request.json`](samples/approved-request.json)                                | `score: 100`, `APPROVED`                      |
+| [`manual-review-request.json`](samples/manual-review-request.json)                      | `score: 40`, `MANUAL_REVIEW`                  |
+| [`rejected-request.json`](samples/rejected-request.json)                                | `score: 0`, `REJECTED`                        |
+| [`invalid-format-request.json`](samples/invalid-format-request.json)                    | `400`, ошибки валидации формата               |
+| [`invalid-business-rules-request.json`](samples/invalid-business-rules-request.json)    | `400`, ошибки бизнес-валидации                |
 
-Try any of them with:
+Попробовать любой из них можно так:
 
 ```bash
 curl -s -X POST http://localhost:8080/api/v1/scoring \
@@ -197,7 +202,7 @@ curl -s -X POST http://localhost:8080/api/v1/scoring \
   -d @samples/manual-review-request.json | python3 -m json.tool
 ```
 
-## Architecture
+## Архитектура
 
 ```
 com.example.scoring
@@ -211,58 +216,65 @@ com.example.scoring
 └── exception     # ScoringValidationException, GlobalExceptionHandler
 ```
 
-The model package only knows about `ScoringFeatures` and `ScoringResult`
-- it has no imports from `api` or Spring Web. This is what makes it
-possible to add `RuleBasedScoringModelV2`, or an entirely different
-implementation, behind the same `ScoringModel` interface without touching
-the API layer (see [migration path](#migration-path-to-ml--onnx--an-external-model-service)).
+Пакет `model` знает только про `ScoringFeatures` и `ScoringResult` — в нём
+нет импортов из `api` или Spring Web. Именно это позволяет добавить
+`RuleBasedScoringModelV2` или совершенно другую реализацию за тем же
+интерфейсом `ScoringModel`, не затрагивая слой API (см.
+[путь миграции](#путь-миграции-на-ml--onnx--внешний-model-service)).
 
-## Testing
+## Тестирование
 
 ```bash
 mvn test
 ```
 
-- `RuleBasedScoringModelV1Test` - approve/manual-review/reject outcomes,
-  decision-threshold boundaries, score clamping.
-- `FeatureBusinessValidatorTest` - each business rule individually and
-  combined.
-- `ScoringServiceTest` - orchestration order (validate before scoring) and
-  short-circuiting on validation failure, with mocked model/validator.
-- `ScoringControllerTest` - HTTP-level behavior with the service mocked
+- `RuleBasedScoringModelV1Test` — сценарии approve/manual-review/reject,
+  граничные значения порогов принятия решения, ограничение score сверху и
+  снизу (clamping).
+- `FeatureBusinessValidatorTest` — каждое бизнес-правило по отдельности и
+  в комбинации.
+- `ScoringServiceTest` — порядок оркестрации (валидация перед скорингом) и
+  прерывание выполнения при ошибке валидации, с мокированными
+  model/validator.
+- `ScoringControllerTest` — поведение на уровне HTTP с замоканным сервисом
   (`@WebMvcTest`).
-- `ScoringApiIntegrationTest` - full Spring context, no mocks, exercising
-  the same approve/manual/reject/business-error scenarios end to end.
+- `ScoringApiIntegrationTest` — полный контекст Spring без моков,
+  прогоняющий те же сценарии approve/manual/reject/business-error
+  целиком, end-to-end.
 
-## Limitations
+## Ограничения
 
-This model is a teaching example, not a credit risk model. Concretely:
+Эта модель — учебный пример, а не модель кредитного риска. В частности:
 
-- **Not trained or statistically validated.** The rules, weights, and
-  thresholds were chosen by hand for illustration; they were not fit or
-  backtested against any historical outcome data.
-- **No calibration.** The `score` is not a calibrated probability of
-  default or repayment; it's an arbitrary point scale.
-- **No fairness/bias analysis.** A model like this, if it were real, would
-  need disparate-impact testing across protected classes before any
-  production use - none has been done here.
-- **Tiny feature set.** Seven fields is not enough signal for a real
-  underwriting decision (no credit bureau data, no transaction history, no
-  collateral, no macro factors, etc.).
-- **Arbitrary thresholds.** 70/40 were picked to produce a readable
-  three-way split in a demo, not derived from any cost/risk analysis.
-- **No monitoring, drift detection, or audit trail.** A production scoring
-  system needs decision logging, model performance monitoring, and a
-  change-management process for rule/threshold updates; none of that
-  exists here.
-- **No authentication, authorization, or rate limiting** on the API.
-- **No real data, no real system integrations.** This service does not
-  call out to any credit bureau, bank, or production system, and none of
-  the sample data represents real people or accounts.
+- **Не обучена и не валидирована статистически.** Правила, веса и пороги
+  подобраны вручную для иллюстрации; они не были подогнаны или
+  протестированы на исторических данных (backtesting).
+- **Нет калибровки.** `score` — это не калиброванная вероятность дефолта
+  или погашения, а произвольная балльная шкала.
+- **Нет анализа справедливости/предвзятости (fairness/bias).** Если бы
+  такая модель была настоящей, ей потребовалось бы тестирование на
+  disparate impact по защищённым категориям перед любым использованием в
+  проде — здесь это не сделано.
+- **Крайне узкий набор признаков.** Семи полей недостаточно для реального
+  андеррайтингового решения (нет данных кредитного бюро, истории
+  транзакций, залога, макроэкономических факторов и т.д.).
+- **Произвольные пороги.** Значения 70/40 подобраны, чтобы получить
+  наглядное деление на три категории в демо, а не выведены из
+  какого-либо анализа стоимости риска.
+- **Нет мониторинга, отслеживания дрейфа модели или аудиторского следа.**
+  Промышленной системе скоринга нужны логирование решений, мониторинг
+  качества модели и процесс управления изменениями правил/порогов —
+  ничего из этого здесь нет.
+- **Нет аутентификации, авторизации или rate limiting** на API.
+- **Нет реальных данных, нет интеграций с реальными системами.** Сервис
+  не обращается ни к одному кредитному бюро, банку или промышленной
+  системе, и ни одни из тестовых данных не представляют реальных людей
+  или счетов.
 
-## Migration path to ML / ONNX / an external model service
+## Путь миграции на ML / ONNX / внешний model service
 
-The `ScoringModel` interface is the seam designed for this:
+Интерфейс `ScoringModel` спроектирован именно как точка расширения для
+этого:
 
 ```java
 public interface ScoringModel {
@@ -271,33 +283,39 @@ public interface ScoringModel {
 }
 ```
 
-Nothing outside the `model` package needs to change to swap the
-implementation, because the API/service layers only ever depend on this
-interface, never on `RuleBasedScoringModelV1` directly.
+Для замены реализации не нужно менять ничего за пределами пакета `model`,
+поскольку слои API/service всегда зависят только от этого интерфейса, а
+не напрямую от `RuleBasedScoringModelV1`.
 
-A realistic path forward:
+Реалистичный путь развития:
 
-1. **Collect labeled outcome data** the proper way: from real, consented,
-   compliant historical decisions/outcomes (not from this demo's sample
-   data), with a documented data governance and fairness review process.
-2. **Train and validate a candidate model offline** (e.g. logistic
-   regression or gradient boosting) against that data, including
-   calibration and bias/fairness testing, and get sign-off from risk/legal
-   before it goes anywhere near production traffic.
-3. **Export the trained model to ONNX** and add an
-   `OnnxScoringModelV2 implements ScoringModel` that loads the `.onnx` file
-   (e.g. via ONNX Runtime's Java bindings) and maps `ScoringFeatures` to the
-   model's input tensor and its output back to a `ScoringResult`.
-   Alternatively, implement a `RemoteScoringModel implements ScoringModel`
-   that calls out to a dedicated external model-serving endpoint (e.g. over
-   HTTP/gRPC), keeping the same interface so the rest of the service is
-   unaware of where scoring actually happens.
-4. **Run champion/challenger evaluation**: keep `rule-based-v1` as the
-   live decision-maker while logging the new model's output side by side,
-   before switching which implementation is wired into `ScoringService`.
-5. **Version everything.** Bump `getVersion()` for every model change so
-   every decision stays traceable to the exact model/version that produced
-   it, and keep old versions available for reproducing past decisions.
-6. **Add production concerns** that this demo intentionally skips:
-   authentication/authorization on the endpoint, request/decision audit
-   logging, model performance and drift monitoring, and a rollback plan.
+1. **Собрать размеченные данные об исходах** правильным способом: из
+   реальных, согласованных и соответствующих требованиям регуляторов
+   исторических решений/исходов (не из тестовых данных этого демо), с
+   документированным процессом data governance и проверкой на
+   справедливость (fairness review).
+2. **Обучить и валидировать кандидатную модель offline** (например,
+   логистическую регрессию или gradient boosting) на этих данных, включая
+   калибровку и тестирование на bias/fairness, и получить согласование от
+   risk/legal перед тем, как она приблизится к боевому трафику.
+3. **Экспортировать обученную модель в ONNX** и добавить
+   `OnnxScoringModelV2 implements ScoringModel`, которая загружает файл
+   `.onnx` (например, через Java-биндинги ONNX Runtime) и преобразует
+   `ScoringFeatures` во входной тензор модели, а её выход — обратно в
+   `ScoringResult`. Альтернативно можно реализовать
+   `RemoteScoringModel implements ScoringModel`, которая обращается к
+   выделенному внешнему model-serving эндпоинту (например, по
+   HTTP/gRPC), сохраняя тот же интерфейс, чтобы остальная часть сервиса
+   не знала, где именно происходит скоринг.
+4. **Провести оценку по схеме champion/challenger**: оставить
+   `rule-based-v1` в качестве действующей модели, принимающей решения,
+   параллельно логируя вывод новой модели, прежде чем переключать, какая
+   именно реализация подключена в `ScoringService`.
+5. **Версионировать всё.** Увеличивать `getVersion()` при каждом
+   изменении модели, чтобы каждое решение оставалось прослеживаемым до
+   конкретной модели/версии, которая его приняла, и хранить старые версии
+   доступными для воспроизведения прошлых решений.
+6. **Добавить эксплуатационные аспекты**, которые это демо намеренно
+   опускает: аутентификацию/авторизацию на эндпоинте, аудиторское
+   логирование запросов/решений, мониторинг качества и дрейфа модели, а
+   также план отката (rollback).
