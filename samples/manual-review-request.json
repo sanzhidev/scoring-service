@@ -1,0 +1,9 @@
+{
+  "requestId": "req-manual-1",
+  "clientAge": 40,
+  "monthlyIncome": 100000,
+  "requestedAmount": 600000,
+  "employmentMonths": 4,
+  "hasOverduePayments": false,
+  "activeLoansCount": 3
+}

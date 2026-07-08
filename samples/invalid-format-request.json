@@ -1,0 +1,9 @@
+{
+  "requestId": "",
+  "clientAge": 10,
+  "monthlyIncome": -5,
+  "requestedAmount": 0,
+  "employmentMonths": -1,
+  "hasOverduePayments": false,
+  "activeLoansCount": 200
+}

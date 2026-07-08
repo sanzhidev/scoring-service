@@ -1,0 +1,9 @@
+{
+  "requestId": "req-business-invalid",
+  "clientAge": 20,
+  "monthlyIncome": 1000,
+  "requestedAmount": 5000000,
+  "employmentMonths": 500,
+  "hasOverduePayments": false,
+  "activeLoansCount": 1
+}

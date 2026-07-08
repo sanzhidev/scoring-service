@@ -1,0 +1,9 @@
+{
+  "requestId": "req-approve-1",
+  "clientAge": 30,
+  "monthlyIncome": 300000,
+  "requestedAmount": 500000,
+  "employmentMonths": 36,
+  "hasOverduePayments": false,
+  "activeLoansCount": 0
+}

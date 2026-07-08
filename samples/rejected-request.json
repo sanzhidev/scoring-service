@@ -1,0 +1,9 @@
+{
+  "requestId": "req-reject-1",
+  "clientAge": 19,
+  "monthlyIncome": 80000,
+  "requestedAmount": 900000,
+  "employmentMonths": 2,
+  "hasOverduePayments": true,
+  "activeLoansCount": 6
+}
